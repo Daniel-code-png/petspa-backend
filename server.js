@@ -38,21 +38,21 @@ app.get('/', (req, res) => {
 app.use((req, res) => {
   res.status(404).json({ message: 'Ruta no encontrada' });
 });
+
+const PORT = process.env.PORT || 5000;
 const corsOptions = {
   origin: process.env.NODE_ENV === 'production' 
-    ? ['https://petspa-frontend.vercel.app/'] // Reemplaza con tu URL de frontend
+    ? ['https://petspa-frontend.vercel.app/'] 
     : ['http://localhost:3000'],
   credentials: true
 };
 
-app.use(cors(corsOptions));
-const PORT = process.env.PORT || 5000;
 
 if (process.env.NODE_ENV !== 'production') {
   app.listen(PORT, () => {
     console.log(`🚀 Servidor corriendo en puerto ${PORT}`);
   });
 }
+app.use(cors(corsOptions));
 
-// Para Vercel (serverless)
 export default app
