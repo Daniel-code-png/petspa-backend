@@ -38,7 +38,14 @@ app.get('/', (req, res) => {
 app.use((req, res) => {
   res.status(404).json({ message: 'Ruta no encontrada' });
 });
+const corsOptions = {
+  origin: process.env.NODE_ENV === 'production' 
+    ? ['https://petspa-frontend.vercel.app/'] // Reemplaza con tu URL de frontend
+    : ['http://localhost:3000'],
+  credentials: true
+};
 
+app.use(cors(corsOptions));
 const PORT = process.env.PORT || 5000;
 
 if (process.env.NODE_ENV !== 'production') {
