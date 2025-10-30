@@ -15,6 +15,15 @@ const generateTimeSlots = () => {
   return slots;
 };
 
+// Función helper para formatear fecha sin zona horaria
+const formatDateWithoutTimezone = (date) => {
+  const d = new Date(date);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 // @route   GET /api/appointments/available/:date
 // @desc    Obtener horarios disponibles para una fecha
 // @access  Private
@@ -23,9 +32,15 @@ router.get('/available/:date', protect, async (req, res) => {
     const { date } = req.params;
     const allSlots = generateTimeSlots();
 
+    // Crear fecha al inicio del día en hora local
+    const searchDate = new Date(date + 'T00:00:00');
+
     // Obtener citas existentes para esa fecha
     const appointments = await Appointment.find({
-      date: new Date(date),
+      date: {
+        $gte: new Date(searchDate.setHours(0, 0, 0, 0)),
+        $lt: new Date(searchDate.setHours(23, 59, 59, 999))
+      },
       status: { $ne: 'Cancelada' }
     }).select('time');
 
@@ -62,9 +77,15 @@ router.post('/', protect, async (req, res) => {
       return res.status(400).json({ message: 'Horario fuera del rango permitido (10:00 - 18:00)' });
     }
 
+    // Crear fecha sin problemas de zona horaria
+    const appointmentDate = new Date(date + 'T12:00:00');
+
     // Verificar si ya existe una cita en ese horario
     const existingAppointment = await Appointment.findOne({
-      date: new Date(date),
+      date: {
+        $gte: new Date(appointmentDate.setHours(0, 0, 0, 0)),
+        $lt: new Date(appointmentDate.setHours(23, 59, 59, 999))
+      },
       time,
       status: { $ne: 'Cancelada' }
     });
@@ -76,7 +97,7 @@ router.post('/', protect, async (req, res) => {
     const appointment = await Appointment.create({
       user: req.user._id,
       service,
-      date: new Date(date),
+      date: new Date(date + 'T12:00:00'),
       time
     });
 
@@ -151,13 +172,18 @@ router.put('/:id', protect, async (req, res) => {
     const { service, date, time, status } = req.body;
 
     // Si se cambia la fecha u hora, verificar disponibilidad
-    if ((date && date !== appointment.date.toISOString().split('T')[0]) || (time && time !== appointment.time)) {
-      const newDate = date ? new Date(date) : appointment.date;
+    if (date || time) {
+      const newDate = date ? new Date(date + 'T12:00:00') : appointment.date;
       const newTime = time || appointment.time;
 
+      const searchDate = new Date(newDate);
+      
       const existingAppointment = await Appointment.findOne({
         _id: { $ne: appointment._id },
-        date: newDate,
+        date: {
+          $gte: new Date(searchDate.setHours(0, 0, 0, 0)),
+          $lt: new Date(searchDate.setHours(23, 59, 59, 999))
+        },
         time: newTime,
         status: { $ne: 'Cancelada' }
       });
@@ -165,10 +191,13 @@ router.put('/:id', protect, async (req, res) => {
       if (existingAppointment) {
         return res.status(400).json({ message: 'Este horario ya está ocupado' });
       }
+
+      if (date) {
+        appointment.date = new Date(date + 'T12:00:00');
+      }
     }
 
     appointment.service = service || appointment.service;
-    appointment.date = date ? new Date(date) : appointment.date;
     appointment.time = time || appointment.time;
     appointment.status = status || appointment.status;
 
